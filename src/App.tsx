@@ -1,21 +1,28 @@
 import { useState, useMemo, useEffect } from 'react';
 import { ArrowDown } from 'lucide-react';
-import { Card } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { TokenSelector } from "@/components/TokenSelector/TokenSelector";
-import { SwapHeader } from "@/components/SwapInterface/SwapHeader";
-import { TokenInput } from "@/components/SwapInterface/TokenInput";
-import { TokenWithChain } from "@/types/token";
+import { useAccount } from 'wagmi';
+import { Card } from './components/ui/card';
+import { Button } from './components/ui/button';
+import { TokenSelector } from './components/TokenSelector/TokenSelector';
+import { SwapHeader } from './components/SwapInterface/SwapHeader';
+import { TokenInput } from './components/SwapInterface/TokenInput';
+import { TokenWithChain } from './types/token';
 import { TOKEN_LIST } from './data/tokens';
 import { useBridgeQuotes } from './hooks/use-bridge-quotes';
+import { useBridgeTransaction } from './hooks/use-bridge-transaction';
 import { QuoteRequest } from './types/bridge';
 import { utils } from 'ethers';
+import { useConnectModal } from '@rainbow-me/rainbowkit';
 
 function App() {
   const [sellAmount, setSellAmount] = useState<string>("0");
   const [buyAmount, setBuyAmount] = useState<string>("0");
   const [isSourceTokenSelectorOpen, setIsSourceTokenSelectorOpen] = useState(false);
   const [isTargetTokenSelectorOpen, setIsTargetTokenSelectorOpen] = useState(false);
+  const [hasClickedBridge, setHasClickedBridge] = useState(false);
+  
+  const { address, isConnected } = useAccount();
+  const { openConnectModal } = useConnectModal();
   
   // Initialize with default tokens on different chains
   const defaultSourceToken: TokenWithChain = {
@@ -63,7 +70,8 @@ function App() {
   }, [sellAmount, sourceToken, targetToken]);
 
   // Get quotes from bridges
-  const { quotes, loading, error } = useBridgeQuotes(quoteRequest);
+  const { quotes, loading: quotesLoading, error: quotesError } = useBridgeQuotes(quoteRequest);
+  const { executeBridge, isLoading: transactionLoading, error: transactionError, hash } = useBridgeTransaction();
 
   // Use the best quote to set the buy amount
   useEffect(() => {
@@ -74,10 +82,10 @@ function App() {
         targetToken.decimals
       );
       setBuyAmount(formattedAmount);
-    } else if (!loading && !error) {
+    } else if (!quotesLoading && !quotesError) {
       setBuyAmount("0");
     }
-  }, [quotes, targetToken.decimals, loading, error]);
+  }, [quotes, targetToken.decimals, quotesLoading, quotesError]);
 
   const handleSellAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
@@ -91,6 +99,30 @@ function App() {
     const value = e.target.value;
     setBuyAmount(value);
   };
+
+  const handleBridgeClick = async () => {
+    if (!isConnected) {
+      openConnectModal?.();
+      return;
+    }
+
+    if (quotes.length === 0 || !address) return;
+
+    try {
+      setHasClickedBridge(true);
+      await executeBridge(quotes[0], address);
+    } catch (error) {
+      console.error('Bridge transaction failed:', error);
+      setHasClickedBridge(false);
+    }
+  };
+
+  // Reset hasClickedBridge when transaction is complete
+  useEffect(() => {
+    if (hash) {
+      setHasClickedBridge(false);
+    }
+  }, [hash]);
 
   return (
     <div className="min-h-screen bg-[#0D111C] text-white flex items-center justify-center p-4">
@@ -129,10 +161,10 @@ function App() {
           />
 
           <div className="px-4 py-2 text-sm text-[#5D6785] flex items-center justify-between">
-            {loading ? (
+            {quotesLoading ? (
               <span>Loading quotes...</span>
-            ) : error ? (
-              <span className="text-red-500">{error}</span>
+            ) : quotesError ? (
+              <span className="text-red-500">{quotesError}</span>
             ) : quotes.length > 0 ? (
               <>
                 <span>
@@ -150,10 +182,22 @@ function App() {
           <div className="p-4">
             <Button 
               className="w-full h-14 text-base font-semibold bg-[#FF00B8] hover:bg-[#E100A4] rounded-2xl"
-              disabled={loading || quotes.length === 0}
+              disabled={quotesLoading || transactionLoading || quotes.length === 0}
+              onClick={handleBridgeClick}
             >
-              {loading ? 'Getting Best Route...' : 'Review Bridge'}
+              {!isConnected ? 'Connect Wallet' :
+               quotesLoading ? 'Getting Best Route...' : 
+               hasClickedBridge && transactionLoading ? 'Confirming Transaction...' : 
+               'Review Bridge'}
             </Button>
+            {transactionError && (
+              <p className="mt-2 text-sm text-red-500">{transactionError.message}</p>
+            )}
+            {hash && (
+              <p className="mt-2 text-sm text-green-500">
+                Transaction submitted! Hash: {hash}
+              </p>
+            )}
           </div>
         </Card>
 

@@ -1,5 +1,6 @@
 import { BigNumber } from 'ethers'
 import { TokenWithChain } from './token'
+import { Address } from 'viem'
 
 export interface BridgeQuote {
   bridgeName: string
@@ -10,6 +11,7 @@ export interface BridgeQuote {
   estimatedGasCost: string
   feeAmount: BigNumber
   priceImpact: number
+  providerData?: SynapseQuoteResponse
 }
 
 export interface QuoteRequest {
@@ -18,13 +20,25 @@ export interface QuoteRequest {
   amount: string
 }
 
-// Synapse specific types
-export interface SynapseQuery {
-  swapAdapter: string
+// Synapse SDK Query types
+export type SynapseSDKQuery = {
   tokenOut: string
   minAmountOut: BigNumber
+  deadline: BigNumber
   rawParams: string
-}
+} & (
+  | {
+      swapAdapter: string
+      routerAdapter?: never
+    }
+  | {
+      swapAdapter?: never
+      routerAdapter: string
+    }
+)
+
+// Our internal Query type matches SDK type
+export type SynapseQuery = SynapseSDKQuery
 
 export interface SynapseQuoteResponse {
   feeAmount: BigNumber
@@ -32,11 +46,19 @@ export interface SynapseQuoteResponse {
   maxAmountOut: BigNumber
   originQuery: SynapseQuery
   destQuery: SynapseQuery
+  routerAddress: string
+}
+
+export interface BridgeTransaction {
+  to: Address
+  data: `0x${string}`
+  value: bigint
+  chainId: number
 }
 
 // Bridge interface that all bridge implementations must follow
 export interface Bridge {
   name: string
   getQuote(request: QuoteRequest): Promise<BridgeQuote>
-  execute(quote: BridgeQuote): Promise<string> // Returns transaction hash
+  prepareTransaction(quote: BridgeQuote, toAddress: string): Promise<BridgeTransaction>
 }

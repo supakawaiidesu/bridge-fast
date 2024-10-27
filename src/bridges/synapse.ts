@@ -1,8 +1,11 @@
 import { BigNumber } from 'ethers'
 import { JsonRpcProvider } from '@ethersproject/providers'
 import { SynapseSDK } from '@synapsecns/sdk-router/dist'
-import { Bridge, BridgeQuote, QuoteRequest } from '../types/bridge'
+import { Bridge, BridgeQuote, BridgeTransaction, QuoteRequest, SynapseQuoteResponse } from '../types/bridge'
 import { getChainId, getChainRpcUrl, SUPPORTED_CHAINS } from '../utils/chains'
+import { Address } from 'viem'
+
+const SYNAPSE_RFQ_ROUTER = '0x00cD000000003f7F682BE4813200893d4e690000'
 
 export class SynapseBridge implements Bridge {
   private sdk: SynapseSDK
@@ -33,7 +36,15 @@ export class SynapseBridge implements Bridge {
     const amount = BigNumber.from(request.amount)
     
     try {
-      const synapseQuote = await this.sdk.bridgeQuote(
+      console.log('Getting Synapse quote with params:', {
+        fromChainId,
+        toChainId,
+        fromToken: request.fromToken.address,
+        toToken: request.toToken.address,
+        amount: amount.toString()
+      })
+
+      const rawQuote = await this.sdk.bridgeQuote(
         fromChainId,
         toChainId,
         request.fromToken.address!,
@@ -44,6 +55,39 @@ export class SynapseBridge implements Bridge {
         }
       )
 
+      console.log('Received raw quote from Synapse:', rawQuote)
+
+      // Add deadline to the quote response
+      const deadline = BigNumber.from(Math.floor(Date.now() / 1000) + 3600) // 1 hour from now
+
+      // Create a properly typed quote response
+      const synapseQuote: SynapseQuoteResponse = {
+        feeAmount: rawQuote.feeAmount,
+        bridgeFee: Number(rawQuote.feeAmount),
+        maxAmountOut: rawQuote.maxAmountOut,
+        routerAddress: SYNAPSE_RFQ_ROUTER, // Use constant router address
+        originQuery: {
+          tokenOut: rawQuote.originQuery.tokenOut,
+          minAmountOut: rawQuote.originQuery.minAmountOut,
+          deadline,
+          rawParams: rawQuote.originQuery.rawParams,
+          ...(rawQuote.originQuery.swapAdapter 
+            ? { swapAdapter: rawQuote.originQuery.swapAdapter }
+            : { routerAdapter: rawQuote.originQuery.routerAdapter! })
+        },
+        destQuery: {
+          tokenOut: rawQuote.destQuery.tokenOut,
+          minAmountOut: rawQuote.destQuery.minAmountOut,
+          deadline,
+          rawParams: rawQuote.destQuery.rawParams,
+          ...(rawQuote.destQuery.swapAdapter 
+            ? { swapAdapter: rawQuote.destQuery.swapAdapter }
+            : { routerAdapter: rawQuote.destQuery.routerAdapter! })
+        }
+      }
+
+      console.log('Processed Synapse quote:', synapseQuote)
+
       return {
         bridgeName: this.name,
         fromToken: request.fromToken,
@@ -51,8 +95,9 @@ export class SynapseBridge implements Bridge {
         fromAmount: amount,
         expectedOutput: synapseQuote.maxAmountOut,
         feeAmount: synapseQuote.feeAmount,
-        estimatedGasCost: '0', // We'll implement proper gas estimation later
-        priceImpact: 0 // We'll calculate this properly later
+        estimatedGasCost: '0',
+        priceImpact: 0,
+        providerData: synapseQuote
       }
     } catch (error) {
       console.error('Synapse quote error:', error)
@@ -60,10 +105,57 @@ export class SynapseBridge implements Bridge {
     }
   }
 
-  async execute(quote: BridgeQuote): Promise<string> {
-    // Implementation for executing the bridge transaction
-    // This would use the SDK's bridge() function with the quote data
-    console.log('Executing bridge transaction with quote:', quote)
-    throw new Error('Bridge execution not implemented yet')
+  async prepareTransaction(quote: BridgeQuote, toAddress: string): Promise<BridgeTransaction> {
+    if (!quote.providerData) {
+      throw new Error('Missing Synapse quote data')
+    }
+
+    const synapseQuote = quote.providerData
+    const fromChainId = getChainId(quote.fromToken.chain)
+    const toChainId = getChainId(quote.toToken.chain)
+
+    if (!fromChainId || !toChainId) {
+      throw new Error('Unsupported chain')
+    }
+
+    try {
+      console.log('Preparing Synapse bridge transaction with params:', {
+        toAddress,
+        routerAddress: SYNAPSE_RFQ_ROUTER,
+        fromChainId,
+        toChainId,
+        fromToken: quote.fromToken.address,
+        fromAmount: quote.fromAmount.toString(),
+        originQuery: synapseQuote.originQuery,
+        destQuery: synapseQuote.destQuery
+      })
+
+      const transaction = await this.sdk.bridge(
+        toAddress as string,
+        SYNAPSE_RFQ_ROUTER, // Use constant router address
+        fromChainId,
+        toChainId,
+        quote.fromToken.address!,
+        quote.fromAmount,
+        synapseQuote.originQuery,
+        synapseQuote.destQuery
+      )
+
+      console.log('Received transaction data from Synapse:', transaction)
+
+      const bridgeTransaction = {
+        to: SYNAPSE_RFQ_ROUTER as Address,
+        data: transaction.data as `0x${string}`,
+        value: BigInt(transaction.value?.toString() || '0'),
+        chainId: fromChainId
+      }
+
+      console.log('Prepared bridge transaction:', bridgeTransaction)
+
+      return bridgeTransaction
+    } catch (error) {
+      console.error('Synapse bridge error:', error)
+      throw error
+    }
   }
 }
