@@ -12,8 +12,8 @@ import { QuoteRequest } from './types/bridge';
 import { utils } from 'ethers';
 
 function App() {
-  const [sellAmount, setSellAmount] = useState<string>("50");
-  const [buyAmount, setBuyAmount] = useState<string>("49.9915");
+  const [sellAmount, setSellAmount] = useState<string>("0");
+  const [buyAmount, setBuyAmount] = useState<string>("0");
   const [isSourceTokenSelectorOpen, setIsSourceTokenSelectorOpen] = useState(false);
   const [isTargetTokenSelectorOpen, setIsTargetTokenSelectorOpen] = useState(false);
   
@@ -45,7 +45,7 @@ function App() {
 
   // Create quote request for the bridge
   const quoteRequest = useMemo<QuoteRequest | null>(() => {
-    if (!sellAmount || !sourceToken || !targetToken) return null;
+    if (!sellAmount || sellAmount === "0" || !sourceToken || !targetToken) return null;
     
     try {
       // Convert amount to proper decimal format
@@ -74,12 +74,17 @@ function App() {
         targetToken.decimals
       );
       setBuyAmount(formattedAmount);
+    } else if (!loading && !error) {
+      setBuyAmount("0");
     }
-  }, [quotes, targetToken.decimals]);
+  }, [quotes, targetToken.decimals, loading, error]);
 
   const handleSellAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
     setSellAmount(value);
+    if (!value || value === "0") {
+      setBuyAmount("0");
+    }
   };
 
   const handleBuyAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
