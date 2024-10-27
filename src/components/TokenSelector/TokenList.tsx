@@ -1,17 +1,15 @@
 import { TOKEN_LIST } from '@/data/tokens';
-import { Token } from '@/types/token';
+import { TokenWithChain } from '@/types/token';
 
-// Define valid chain keys
 type ChainKey = 'ethereum' | 'optimism' | 'arbitrum' | 'polygon' | 'base';
 
 interface TokenListProps {
   searchQuery: string;
   selectedChain: string;
-  onSelect: (token: Token) => void;
+  onSelect: (token: TokenWithChain) => void;
 }
 
 export function TokenList({ searchQuery, selectedChain, onSelect }: TokenListProps) {
-  // Helper function to convert chain name to valid key
   const normalizeChainKey = (chain: string): ChainKey | null => {
     const key = chain.toLowerCase();
     if (key === 'ethereum' || 
@@ -24,7 +22,6 @@ export function TokenList({ searchQuery, selectedChain, onSelect }: TokenListPro
     return null;
   };
 
-  // Helper function to check if token is available on a chain
   const isTokenAvailableOnChain = (
     token: typeof TOKEN_LIST.tokens[0], 
     chain: string
@@ -52,24 +49,22 @@ export function TokenList({ searchQuery, selectedChain, onSelect }: TokenListPro
   return (
     <div className="space-y-2">
       {filteredTokens.map((token) => {
-        // Get the token address for the selected chain
         const chainKey = normalizeChainKey(selectedChain);
         let tokenAddress = '';
         
         if (selectedChain === 'All networks') {
-          // Use first available address for "All networks"
           const firstChainKey = Object.keys(token.addresses)[0] as ChainKey;
           tokenAddress = token.addresses[firstChainKey] ?? '';
         } else if (chainKey && chainKey in token.addresses) {
           tokenAddress = token.addresses[chainKey] ?? '';
         }
         
-        // Transform to Token for the UI
-        const uiToken: Token = {
+        const uiToken: TokenWithChain = {
           symbol: token.symbol,
           name: token.name,
           logo: token.logo,
-          chain: selectedChain,
+          chain: selectedChain === 'All networks' ? 'Ethereum' : selectedChain,
+          address: tokenAddress,
           balance: '0',
           value: '$0.00'
         };

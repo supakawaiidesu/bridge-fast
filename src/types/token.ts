@@ -17,3 +17,8 @@ export interface Token {
   chain: string;
   value?: string;
 }
+
+export interface TokenWithChain extends Token {
+  chain: string;
+  address?: string;
+}

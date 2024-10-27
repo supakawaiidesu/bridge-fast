@@ -6,25 +6,38 @@ import { Button } from "@/components/ui/button";
 import { TokenSelector } from '@/components/TokenSelector/TokenSelector';
 import { SwapHeader } from '@/components/SwapInterface/SwapHeader';
 import { TokenInput } from '@/components/SwapInterface/TokenInput';
-import { Token } from '@/types/token';
+import { Token, TokenWithChain } from '@/types/token';
 import { TOKEN_LIST } from './data/tokens';
 
 function App() {
   const [sellAmount, setSellAmount] = useState<string>("50");
   const [buyAmount, setBuyAmount] = useState<string>("49.9915");
-  const [isTokenSelectorOpen, setIsTokenSelectorOpen] = useState(false);
+  const [isSourceTokenSelectorOpen, setIsSourceTokenSelectorOpen] = useState(false);
+  const [isTargetTokenSelectorOpen, setIsTargetTokenSelectorOpen] = useState(false);
   
-  // Transform the token to match our UI Token interface
-  const defaultToken: Token = {
+  // Initialize with default tokens on different chains
+  const defaultSourceToken: TokenWithChain = {
     symbol: TOKEN_LIST.tokens[1].symbol,
     name: TOKEN_LIST.tokens[1].name,
     logo: TOKEN_LIST.tokens[1].logo,
-    chain: 'Ethereum', // Default chain
+    chain: 'Ethereum',
+    address: TOKEN_LIST.tokens[1].addresses.ethereum,
     balance: '0',
     value: '$0.00'
   };
   
-  const [selectedToken, setSelectedToken] = useState<Token>(defaultToken);
+  const defaultTargetToken: TokenWithChain = {
+    symbol: TOKEN_LIST.tokens[1].symbol,
+    name: TOKEN_LIST.tokens[1].name,
+    logo: TOKEN_LIST.tokens[1].logo,
+    chain: 'Optimism',
+    address: TOKEN_LIST.tokens[1].addresses.optimism,
+    balance: '0',
+    value: '$0.00'
+  };
+  
+  const [sourceToken, setSourceToken] = useState<TokenWithChain>(defaultSourceToken);
+  const [targetToken, setTargetToken] = useState<TokenWithChain>(defaultTargetToken);
 
   const handleSellAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
@@ -47,10 +60,11 @@ function App() {
           <TokenInput
             label="Sell"
             amount={sellAmount}
-            token={selectedToken}
-            balance={selectedToken.balance}
+            token={sourceToken}
+            balance={sourceToken.balance}
             onAmountChange={handleSellAmountChange}
-            onTokenSelect={() => setIsTokenSelectorOpen(true)}
+            onTokenSelect={() => setIsSourceTokenSelectorOpen(true)}
+            showChain={true}
           />
 
           <div className="flex justify-center -my-2.5 relative z-10">
@@ -66,14 +80,15 @@ function App() {
           <TokenInput
             label="Buy"
             amount={buyAmount}
-            token={selectedToken}
-            balance={selectedToken.balance}
+            token={targetToken}
+            balance={targetToken.balance}
             onAmountChange={handleBuyAmountChange}
-            onTokenSelect={() => setIsTokenSelectorOpen(true)}
+            onTokenSelect={() => setIsTargetTokenSelectorOpen(true)}
+            showChain={true}
           />
 
           <div className="px-4 py-2 text-sm text-[#5D6785] flex items-center justify-between">
-            <span>1 {selectedToken.symbol} = 1.00017 {selectedToken.symbol} ($1.00)</span>
+            <span>1 {sourceToken.symbol} = 1.00017 {targetToken.symbol} ($1.00)</span>
             <span className="flex items-center gap-1">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="text-[#5D6785]">
                 <path d="M12 4L12 20M12 4L18 10M12 4L6 10" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
@@ -90,9 +105,17 @@ function App() {
         </Card>
 
         <TokenSelector
-          isOpen={isTokenSelectorOpen}
-          onClose={() => setIsTokenSelectorOpen(false)}
-          onSelect={setSelectedToken}
+          isOpen={isSourceTokenSelectorOpen}
+          onClose={() => setIsSourceTokenSelectorOpen(false)}
+          onSelect={(token) => setSourceToken(token as TokenWithChain)}
+          currentChain={sourceToken.chain}
+        />
+
+        <TokenSelector
+          isOpen={isTargetTokenSelectorOpen}
+          onClose={() => setIsTargetTokenSelectorOpen(false)}
+          onSelect={(token) => setTargetToken(token as TokenWithChain)}
+          currentChain={targetToken.chain}
         />
       </div>
     </div>
