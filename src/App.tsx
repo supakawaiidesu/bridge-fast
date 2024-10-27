@@ -3,10 +3,10 @@ import { useState } from 'react';
 import { ArrowDown } from 'lucide-react';
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { TokenSelector } from '@/components/TokenSelector/TokenSelector';
-import { SwapHeader } from '@/components/SwapInterface/SwapHeader';
-import { TokenInput } from '@/components/SwapInterface/TokenInput';
-import { Token, TokenWithChain } from '@/types/token';
+import { TokenSelector } from "@/components/TokenSelector/TokenSelector";
+import { SwapHeader } from "@/components/SwapInterface/SwapHeader";
+import { TokenInput } from "@/components/SwapInterface/TokenInput";
+import { TokenWithChain } from "@/types/token";
 import { TOKEN_LIST } from './data/tokens';
 
 function App() {

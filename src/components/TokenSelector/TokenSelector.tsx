@@ -11,17 +11,18 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
 import { ChainSelector } from './ChainSelector';
 import { TokenList } from './TokenList';
-import { Token } from '@/types/token';
+import { TokenWithChain } from '@/types/token';
 
 interface TokenSelectorProps {
   isOpen: boolean;
   onClose: () => void;
-  onSelect: (token: Token) => void;
+  onSelect: (token: TokenWithChain) => void;
+  currentChain: string;
 }
 
-export function TokenSelector({ isOpen, onClose, onSelect }: TokenSelectorProps) {
+export function TokenSelector({ isOpen, onClose, onSelect, currentChain }: TokenSelectorProps) {
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedChain, setSelectedChain] = useState('All networks');
+  const [selectedChain, setSelectedChain] = useState(currentChain);
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -37,7 +38,7 @@ export function TokenSelector({ isOpen, onClose, onSelect }: TokenSelectorProps)
               onClick={onClose}
               className="text-[#5D6785] hover:text-white"
             >
-              <X className="h-5 w-5" />
+              <X className="w-5 h-5" />
             </Button>
           </div>
         </DialogHeader>

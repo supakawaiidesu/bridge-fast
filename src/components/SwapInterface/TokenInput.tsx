@@ -8,7 +8,7 @@ interface TokenInputProps {
   label: string;
   amount: string;
   token: TokenWithChain;
-  balance: string;
+  balance?: string;
   onAmountChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
   onTokenSelect: () => void;
   showChain?: boolean;
@@ -18,7 +18,7 @@ export function TokenInput({
   label, 
   amount, 
   token, 
-  balance, 
+  balance = '0', 
   onAmountChange, 
   onTokenSelect,
   showChain = false

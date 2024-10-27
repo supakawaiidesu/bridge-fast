@@ -1,7 +1,9 @@
-import { TOKEN_LIST } from '@/data/tokens';
-import { TokenWithChain } from '@/types/token';
-
-type ChainKey = 'ethereum' | 'optimism' | 'arbitrum' | 'polygon' | 'base';
+// src/components/TokenSelector/TokenList.tsx
+import { TOKEN_LIST } from '../../data/tokens';
+import { TokenWithChain } from '../../types/token';
+import { useTokenBalances } from '../../hooks/use-token-balances';
+import { useAccount } from 'wagmi';
+import { Skeleton } from '../ui/skeleton';
 
 interface TokenListProps {
   searchQuery: string;
@@ -10,85 +12,92 @@ interface TokenListProps {
 }
 
 export function TokenList({ searchQuery, selectedChain, onSelect }: TokenListProps) {
-  const normalizeChainKey = (chain: string): ChainKey | null => {
-    const key = chain.toLowerCase();
-    if (key === 'ethereum' || 
-        key === 'optimism' || 
-        key === 'arbitrum' || 
-        key === 'polygon' || 
-        key === 'base') {
-      return key as ChainKey;
-    }
-    return null;
-  };
+  const { isConnected } = useAccount();
+  const { balances, isLoading } = useTokenBalances(selectedChain);
 
-  const isTokenAvailableOnChain = (
-    token: typeof TOKEN_LIST.tokens[0], 
-    chain: string
-  ): boolean => {
-    if (chain === 'All networks') {
-      return Object.keys(token.addresses).length > 0;
-    }
-    
-    const chainKey = normalizeChainKey(chain);
-    if (!chainKey) return false;
-    
-    return chainKey in token.addresses;
-  };
-
-  const filteredTokens = TOKEN_LIST.tokens.filter((token) => {
+  // Filter tokens based on search query
+  const filteredBalances = balances.filter((asset) => {
     const matchesSearch = 
-      token.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      token.symbol.toLowerCase().includes(searchQuery.toLowerCase());
-    
-    const matchesChain = isTokenAvailableOnChain(token, selectedChain);
-    
-    return matchesSearch && matchesChain;
+      asset.tokenName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      asset.tokenSymbol.toLowerCase().includes(searchQuery.toLowerCase());
+    return matchesSearch;
   });
+
+  const formatChainName = (blockchain: string): string => {
+    if (blockchain === 'eth') return 'Ethereum';
+    return blockchain.charAt(0).toUpperCase() + blockchain.slice(1);
+  };
 
   return (
     <div className="space-y-2">
-      {filteredTokens.map((token) => {
-        const chainKey = normalizeChainKey(selectedChain);
-        let tokenAddress = '';
-        
-        if (selectedChain === 'All networks') {
-          const firstChainKey = Object.keys(token.addresses)[0] as ChainKey;
-          tokenAddress = token.addresses[firstChainKey] ?? '';
-        } else if (chainKey && chainKey in token.addresses) {
-          tokenAddress = token.addresses[chainKey] ?? '';
-        }
-        
-        const uiToken: TokenWithChain = {
-          symbol: token.symbol,
-          name: token.name,
-          logo: token.logo,
-          chain: selectedChain === 'All networks' ? 'Ethereum' : selectedChain,
-          address: tokenAddress,
-          balance: '0',
-          value: '$0.00'
-        };
-        
-        return (
-          <button
-            key={`${token.symbol}-${tokenAddress}`}
-            onClick={() => onSelect(uiToken)}
-            className="w-full p-3 flex items-center justify-between rounded-lg hover:bg-[#2B2D33] transition-colors"
-          >
+      {isLoading ? (
+        // Loading state
+        Array(3).fill(0).map((_, i) => (
+          <div key={i} className="w-full p-3 flex items-center justify-between rounded-lg bg-[#2B2D33]">
             <div className="flex items-center gap-3">
-              <img src={token.logo} alt={token.name} className="w-8 h-8" />
-              <div className="text-left">
-                <div className="font-medium text-white">{token.symbol}</div>
-                <div className="text-sm text-[#5D6785]">{token.name}</div>
+              <Skeleton className="h-8 w-8 rounded-full bg-[#3B3D43]" />
+              <div className="space-y-2">
+                <Skeleton className="h-5 w-20 bg-[#3B3D43]" />
+                <Skeleton className="h-4 w-24 bg-[#3B3D43]" />
               </div>
             </div>
-            <div className="text-right">
-              <div className="font-medium text-white">0</div>
-              <div className="text-sm text-[#5D6785]">$0.00</div>
+            <div className="space-y-1 text-right">
+              <Skeleton className="h-5 w-20 bg-[#3B3D43]" />
+              <Skeleton className="h-4 w-16 bg-[#3B3D43]" />
             </div>
-          </button>
-        );
-      })}
+          </div>
+        ))
+      ) : (
+        filteredBalances.map((asset) => {
+          const uiToken: TokenWithChain = {
+            symbol: asset.tokenSymbol,
+            name: asset.tokenName,
+            logo: asset.thumbnail || TOKEN_LIST.tokens.find(t => t.symbol === asset.tokenSymbol)?.logo || '',
+            chain: formatChainName(asset.blockchain),
+            address: asset.contractAddress || '',
+            balance: asset.balance,
+            value: `$${parseFloat(asset.balanceUsd).toFixed(2)}`
+          };
+          
+          return (
+            <button
+              key={`${asset.tokenSymbol}-${asset.blockchain}-${asset.contractAddress || 'native'}`}
+              onClick={() => onSelect(uiToken)}
+              className="w-full p-3 flex items-center justify-between rounded-lg hover:bg-[#2B2D33] transition-colors"
+            >
+              <div className="flex items-center gap-3">
+                <img 
+                  src={uiToken.logo} 
+                  alt={asset.tokenName} 
+                  className="w-8 h-8"
+                  onError={(e) => {
+                    const img = e.target as HTMLImageElement;
+                    img.src = 'https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/info/logo.png';
+                  }}
+                />
+                <div className="text-left">
+                  <div className="font-medium text-white">{asset.tokenSymbol}</div>
+                  <div className="text-sm text-[#5D6785]">
+                    {asset.tokenName}
+                    {selectedChain === 'All networks' && (
+                      <span className="ml-2 text-[#5D6785]">on {formatChainName(asset.blockchain)}</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+              <div className="text-right">
+                <div className="font-medium text-white">{parseFloat(asset.balance).toFixed(6)}</div>
+                <div className="text-sm text-[#5D6785]">${parseFloat(asset.balanceUsd).toFixed(2)}</div>
+              </div>
+            </button>
+          );
+        })
+      )}
+      {!isLoading && filteredBalances.length === 0 && (
+        <div className="text-center text-[#5D6785] py-4">
+          {isConnected ? 'No tokens found' : 'Connect wallet to view balances'}
+        </div>
+      )}
     </div>
   );
 }

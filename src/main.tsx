@@ -15,11 +15,11 @@ const config = getDefaultConfig({
   projectId: 'YOUR_PROJECT_ID', // Get a project ID from https://cloud.walletconnect.com
   chains: [mainnet, polygon, optimism, arbitrum, base],
   transports: {
-    [mainnet.id]: http(),
-    [polygon.id]: http(),
-    [optimism.id]: http(),
-    [arbitrum.id]: http(),
-    [base.id]: http(),
+    [mainnet.id]: http('https://rpc.ankr.com/eth/757fd7b22f376e3de558f4314e5ec7acfed5b77c6ec675900d6ca9a97708f9ee'),
+    [polygon.id]: http('https://rpc.ankr.com/polygon/757fd7b22f376e3de558f4314e5ec7acfed5b77c6ec675900d6ca9a97708f9ee'),
+    [optimism.id]: http('https://rpc.ankr.com/optimism/757fd7b22f376e3de558f4314e5ec7acfed5b77c6ec675900d6ca9a97708f9ee'),
+    [arbitrum.id]: http('https://rpc.ankr.com/arbitrum/757fd7b22f376e3de558f4314e5ec7acfed5b77c6ec675900d6ca9a97708f9ee'),
+    [base.id]: http('https://rpc.ankr.com/base/757fd7b22f376e3de558f4314e5ec7acfed5b77c6ec675900d6ca9a97708f9ee'),
   },
   ssr: true // Enable if you're using SSR
 });
