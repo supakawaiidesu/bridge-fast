@@ -1,5 +1,4 @@
-// App.tsx
-import { useState } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { ArrowDown } from 'lucide-react';
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -8,6 +7,9 @@ import { SwapHeader } from "@/components/SwapInterface/SwapHeader";
 import { TokenInput } from "@/components/SwapInterface/TokenInput";
 import { TokenWithChain } from "@/types/token";
 import { TOKEN_LIST } from './data/tokens';
+import { useBridgeQuotes } from './hooks/use-bridge-quotes';
+import { QuoteRequest } from './types/bridge';
+import { utils } from 'ethers';
 
 function App() {
   const [sellAmount, setSellAmount] = useState<string>("50");
@@ -22,6 +24,7 @@ function App() {
     logo: TOKEN_LIST.tokens[1].logo,
     chain: 'Ethereum',
     address: TOKEN_LIST.tokens[1].addresses.ethereum,
+    decimals: TOKEN_LIST.tokens[1].decimals,
     balance: '0',
     value: '$0.00'
   };
@@ -32,6 +35,7 @@ function App() {
     logo: TOKEN_LIST.tokens[1].logo,
     chain: 'Optimism',
     address: TOKEN_LIST.tokens[1].addresses.optimism,
+    decimals: TOKEN_LIST.tokens[1].decimals,
     balance: '0',
     value: '$0.00'
   };
@@ -39,16 +43,48 @@ function App() {
   const [sourceToken, setSourceToken] = useState<TokenWithChain>(defaultSourceToken);
   const [targetToken, setTargetToken] = useState<TokenWithChain>(defaultTargetToken);
 
+  // Create quote request for the bridge
+  const quoteRequest = useMemo<QuoteRequest | null>(() => {
+    if (!sellAmount || !sourceToken || !targetToken) return null;
+    
+    try {
+      // Convert amount to proper decimal format
+      const parsedAmount = utils.parseUnits(sellAmount, sourceToken.decimals).toString();
+      
+      return {
+        fromToken: sourceToken,
+        toToken: targetToken,
+        amount: parsedAmount
+      };
+    } catch (err) {
+      console.error('Failed to create quote request:', err);
+      return null;
+    }
+  }, [sellAmount, sourceToken, targetToken]);
+
+  // Get quotes from bridges
+  const { quotes, loading, error } = useBridgeQuotes(quoteRequest);
+
+  // Use the best quote to set the buy amount
+  useEffect(() => {
+    if (quotes.length > 0) {
+      const bestQuote = quotes[0]; // Quotes are sorted by best rate
+      const formattedAmount = utils.formatUnits(
+        bestQuote.expectedOutput,
+        targetToken.decimals
+      );
+      setBuyAmount(formattedAmount);
+    }
+  }, [quotes, targetToken.decimals]);
+
   const handleSellAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
     setSellAmount(value);
-    setBuyAmount((parseFloat(value) * 0.99983).toFixed(4));
   };
 
   const handleBuyAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
     setBuyAmount(value);
-    setSellAmount((parseFloat(value) / 0.99983).toFixed(4));
   };
 
   return (
@@ -88,18 +124,30 @@ function App() {
           />
 
           <div className="px-4 py-2 text-sm text-[#5D6785] flex items-center justify-between">
-            <span>1 {sourceToken.symbol} = 1.00017 {targetToken.symbol} ($1.00)</span>
-            <span className="flex items-center gap-1">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="text-[#5D6785]">
-                <path d="M12 4L12 20M12 4L18 10M12 4L6 10" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
-              $0.02
-            </span>
+            {loading ? (
+              <span>Loading quotes...</span>
+            ) : error ? (
+              <span className="text-red-500">{error}</span>
+            ) : quotes.length > 0 ? (
+              <>
+                <span>
+                  Best rate via {quotes[0].bridgeName}
+                </span>
+                <span className="flex items-center gap-1">
+                  Fee: {utils.formatUnits(quotes[0].feeAmount, sourceToken.decimals)} {sourceToken.symbol}
+                </span>
+              </>
+            ) : (
+              <span>No quotes available</span>
+            )}
           </div>
 
           <div className="p-4">
-            <Button className="w-full h-14 text-base font-semibold bg-[#FF00B8] hover:bg-[#E100A4] rounded-2xl">
-              Review
+            <Button 
+              className="w-full h-14 text-base font-semibold bg-[#FF00B8] hover:bg-[#E100A4] rounded-2xl"
+              disabled={loading || quotes.length === 0}
+            >
+              {loading ? 'Getting Best Route...' : 'Review Bridge'}
             </Button>
           </div>
         </Card>

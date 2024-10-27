@@ -1,4 +1,3 @@
-// src/components/TokenSelector/TokenList.tsx
 import { TOKEN_LIST } from '../../data/tokens';
 import { TokenWithChain } from '../../types/token';
 import { useTokenBalances } from '../../hooks/use-token-balances';
@@ -49,12 +48,14 @@ export function TokenList({ searchQuery, selectedChain, onSelect }: TokenListPro
         ))
       ) : (
         filteredBalances.map((asset) => {
+          const tokenInfo = TOKEN_LIST.tokens.find(t => t.symbol === asset.tokenSymbol);
           const uiToken: TokenWithChain = {
             symbol: asset.tokenSymbol,
             name: asset.tokenName,
-            logo: asset.thumbnail || TOKEN_LIST.tokens.find(t => t.symbol === asset.tokenSymbol)?.logo || '',
+            logo: asset.thumbnail || tokenInfo?.logo || '',
             chain: formatChainName(asset.blockchain),
             address: asset.contractAddress || '',
+            decimals: tokenInfo?.decimals || 18, // Default to 18 decimals if not found
             balance: asset.balance,
             value: `$${parseFloat(asset.balanceUsd).toFixed(2)}`
           };

@@ -16,9 +16,11 @@ export interface Token {
   balance?: string;
   chain: string;
   value?: string;
+  decimals: number;
 }
 
 export interface TokenWithChain extends Token {
   chain: string;
   address?: string;
+  decimals: number;
 }
