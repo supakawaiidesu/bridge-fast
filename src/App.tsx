@@ -1,18 +1,30 @@
+// App.tsx
 import { useState } from 'react';
 import { ArrowDown } from 'lucide-react';
-import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { TokenSelector } from '@/components/TokenSelector/TokenSelector';
 import { SwapHeader } from '@/components/SwapInterface/SwapHeader';
 import { TokenInput } from '@/components/SwapInterface/TokenInput';
 import { Token } from '@/types/token';
-import { tokens } from '@/data/tokens';
+import { TOKEN_LIST } from './data/tokens';
 
 function App() {
   const [sellAmount, setSellAmount] = useState<string>("50");
   const [buyAmount, setBuyAmount] = useState<string>("49.9915");
   const [isTokenSelectorOpen, setIsTokenSelectorOpen] = useState(false);
-  const [selectedToken, setSelectedToken] = useState<Token>(tokens[1]); // USDC
+  
+  // Transform the token to match our UI Token interface
+  const defaultToken: Token = {
+    symbol: TOKEN_LIST.tokens[1].symbol,
+    name: TOKEN_LIST.tokens[1].name,
+    logo: TOKEN_LIST.tokens[1].logo,
+    chain: 'Ethereum', // Default chain
+    balance: '0',
+    value: '$0.00'
+  };
+  
+  const [selectedToken, setSelectedToken] = useState<Token>(defaultToken);
 
   const handleSellAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
@@ -47,7 +59,7 @@ function App() {
               size="icon" 
               className="h-10 w-10 rounded-xl bg-[#131A2A] border border-[#2B2D33] hover:bg-[#1C2537]"
             >
-              <ArrowDown className="h-4 w-4" />
+              <ArrowDown className="w-4 h-4" />
             </Button>
           </div>
 
@@ -55,7 +67,7 @@ function App() {
             label="Buy"
             amount={buyAmount}
             token={selectedToken}
-            balance="0.004"
+            balance={selectedToken.balance}
             onAmountChange={handleBuyAmountChange}
             onTokenSelect={() => setIsTokenSelectorOpen(true)}
           />
@@ -70,9 +82,11 @@ function App() {
             </span>
           </div>
 
-          <Button className="w-full h-14 text-base font-semibold bg-[#FF00B8] hover:bg-[#E100A4] rounded-2xl">
-            Review
-          </Button>
+          <div className="p-4">
+            <Button className="w-full h-14 text-base font-semibold bg-[#FF00B8] hover:bg-[#E100A4] rounded-2xl">
+              Review
+            </Button>
+          </div>
         </Card>
 
         <TokenSelector
