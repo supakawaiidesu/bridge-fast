@@ -31,16 +31,30 @@ export function useBridgeQuotes(request: QuoteRequest | null) {
         // Fetch quotes from all bridges in parallel
         const quotePromises = bridges.map(bridge => 
           bridge.getQuote(request)
-            .then(quote => newQuotes.push(quote))
+            .then(quote => {
+              console.log(`Received quote from ${bridge.name}:`, {
+                expectedOutput: quote.expectedOutput.toString(),
+                feeAmount: quote.feeAmount.toString(),
+                priceImpact: quote.priceImpact
+              })
+              newQuotes.push(quote)
+            })
             .catch(err => console.error(`${bridge.name} quote failed:`, err))
         )
 
         await Promise.all(quotePromises)
         
-        // Sort quotes by expected output (best rate first)
-        newQuotes.sort((a, b) => 
-          b.expectedOutput.gt(a.expectedOutput) ? 1 : -1
-        )
+        // Sort quotes by expected output (highest first for best rate)
+        newQuotes.sort((a, b) => {
+          if (a.expectedOutput.gt(b.expectedOutput)) return -1
+          if (b.expectedOutput.gt(a.expectedOutput)) return 1
+          return 0
+        })
+
+        console.log('Sorted quotes:', newQuotes.map(q => ({
+          bridge: q.bridgeName,
+          expectedOutput: q.expectedOutput.toString()
+        })))
 
         setQuotes(newQuotes)
       } catch (err) {
