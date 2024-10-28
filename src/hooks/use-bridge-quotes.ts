@@ -9,6 +9,9 @@ const bridges = [
   new DeBridge()
 ]
 
+// Refresh interval in milliseconds
+const REFRESH_INTERVAL = 10000 // 10 seconds
+
 export function useBridgeQuotes(request: QuoteRequest | null) {
   const [quotes, setQuotes] = useState<BridgeQuote[]>([])
   const [loading, setLoading] = useState(false)
@@ -46,7 +49,14 @@ export function useBridgeQuotes(request: QuoteRequest | null) {
       }
     }
 
+    // Initial fetch
     fetchQuotes()
+
+    // Set up interval for periodic refreshes
+    const intervalId = setInterval(fetchQuotes, REFRESH_INTERVAL)
+
+    // Cleanup interval on unmount or when request changes
+    return () => clearInterval(intervalId)
   }, [request])
 
   return { quotes, loading, error }
