@@ -97,7 +97,7 @@ export class SynapseBridge implements Bridge {
         feeAmount: synapseQuote.feeAmount,
         estimatedGasCost: '0',
         priceImpact: 0,
-        providerData: synapseQuote
+        providerData: synapseQuote as SynapseQuoteResponse // Type assertion to ensure correct type
       }
     } catch (error) {
       console.error('Synapse quote error:', error)
@@ -106,11 +106,11 @@ export class SynapseBridge implements Bridge {
   }
 
   async prepareTransaction(quote: BridgeQuote, toAddress: string): Promise<BridgeTransaction> {
-    if (!quote.providerData) {
+    if (!quote.providerData || !('originQuery' in quote.providerData)) {
       throw new Error('Missing Synapse quote data')
     }
 
-    const synapseQuote = quote.providerData
+    const synapseQuote = quote.providerData as SynapseQuoteResponse
     const fromChainId = getChainId(quote.fromToken.chain)
     const toChainId = getChainId(quote.toToken.chain)
 

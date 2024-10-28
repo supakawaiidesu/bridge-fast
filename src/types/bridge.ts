@@ -2,25 +2,7 @@ import { BigNumber } from 'ethers'
 import { TokenWithChain } from './token'
 import { Address } from 'viem'
 
-export interface BridgeQuote {
-  bridgeName: string
-  fromToken: TokenWithChain
-  toToken: TokenWithChain
-  fromAmount: BigNumber
-  expectedOutput: BigNumber
-  estimatedGasCost: string
-  feeAmount: BigNumber
-  priceImpact: number
-  providerData?: SynapseQuoteResponse
-}
-
-export interface QuoteRequest {
-  fromToken: TokenWithChain
-  toToken: TokenWithChain
-  amount: string
-}
-
-// Synapse SDK Query types
+// Synapse specific types
 export type SynapseSDKQuery = {
   tokenOut: string
   minAmountOut: BigNumber
@@ -37,7 +19,6 @@ export type SynapseSDKQuery = {
     }
 )
 
-// Our internal Query type matches SDK type
 export type SynapseQuery = SynapseSDKQuery
 
 export interface SynapseQuoteResponse {
@@ -47,6 +28,83 @@ export interface SynapseQuoteResponse {
   originQuery: SynapseQuery
   destQuery: SynapseQuery
   routerAddress: string
+}
+
+// DeBridge specific types
+interface TokenDetails {
+  address: string
+  chainId: number
+  decimals: number
+  name: string
+  symbol: string
+  amount: string
+  approximateUsdValue: number
+}
+
+interface CostDetail {
+  chain: string
+  tokenIn: string
+  tokenOut: string
+  amountIn: string
+  amountOut: string
+  type: string
+  payload: {
+    feeAmount?: string
+    feeBps?: string
+    amountOutBeforeCorrection?: string
+    estimatedVolatilityBps?: string
+  }
+}
+
+interface DebridgeTransaction {
+  data: string
+  to: string
+  value: string
+  allowanceTarget: string
+  allowanceValue: string
+}
+
+interface DebridgeOrder {
+  approximateFulfillmentDelay: number
+  salt?: number
+  metadata?: string
+}
+
+export interface DebridgeQuoteResponse {
+  estimation: {
+    srcChainTokenIn: TokenDetails
+    dstChainTokenOut: TokenDetails & {
+      recommendedAmount: string
+      maxTheoreticalAmount: string
+    }
+    costsDetails: CostDetail[]
+    recommendedSlippage: number
+  }
+  tx: DebridgeTransaction
+  order: DebridgeOrder
+  fixFee: string
+  orderId?: string
+  userPoints?: number
+  integratorPoints?: number
+}
+
+// Bridge quote with properly typed provider data
+export interface BridgeQuote {
+  bridgeName: string
+  fromToken: TokenWithChain
+  toToken: TokenWithChain
+  fromAmount: BigNumber
+  expectedOutput: BigNumber
+  estimatedGasCost: string
+  feeAmount: BigNumber
+  priceImpact: number
+  providerData?: SynapseQuoteResponse | DebridgeQuoteResponse
+}
+
+export interface QuoteRequest {
+  fromToken: TokenWithChain
+  toToken: TokenWithChain
+  amount: string
 }
 
 export interface BridgeTransaction {

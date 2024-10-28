@@ -9,8 +9,9 @@ import {
   usePublicClient,
   useWaitForTransactionReceipt,
 } from 'wagmi'
-import { BridgeQuote } from '../types/bridge'
+import { BridgeQuote, DebridgeQuoteResponse, SynapseQuoteResponse } from '../types/bridge'
 import { SynapseBridge } from '../bridges/synapse'
+import { DeBridge } from '../bridges/debridge'
 import { Address } from 'viem'
 import { getChainId } from '../utils/chains'
 
@@ -44,8 +45,6 @@ interface BridgeTransactionState {
   hash: `0x${string}` | undefined
   needsApproval: boolean
 }
-
-const SYNAPSE_RFQ_ROUTER = '0x00cD000000003f7F682BE4813200893d4e690000' as const
 
 export function useBridgeTransaction() {
   const [state, setState] = useState<BridgeTransactionState>({
@@ -110,14 +109,14 @@ export function useBridgeTransaction() {
 
       try {
         // Request approval
-        const result = await writeContractAsync({
+        const hash = await writeContractAsync({
           address: tokenAddress,
           abi: ERC20_ABI,
           functionName: 'approve',
           args: [spender, amount],
         })
 
-        setState(prev => ({ ...prev, hash: result }))
+        setState(prev => ({ ...prev, hash }))
       } catch (error) {
         console.error('Approval error:', error)
         throw error
@@ -152,11 +151,27 @@ export function useBridgeTransaction() {
           await switchChain({ chainId: requiredChainId })
         }
 
+        // Get the spender address from the quote's provider data
+        let spenderAddress: Address
+        const providerData = quote.providerData
+
+        if (!providerData) {
+          throw new Error('Missing provider data in quote')
+        }
+
+        if (quote.bridgeName === 'Synapse') {
+          const synapseData = providerData as SynapseQuoteResponse
+          spenderAddress = synapseData.routerAddress as Address
+        } else {
+          const debridgeData = providerData as DebridgeQuoteResponse
+          spenderAddress = debridgeData.tx.allowanceTarget as Address
+        }
+
         // Check if approval is needed
         const amountRequired = BigInt(quote.fromAmount.toString())
         const hasAllowance = await checkAllowance(
           quote.fromToken.address as Address,
-          SYNAPSE_RFQ_ROUTER as Address,
+          spenderAddress,
           amountRequired
         )
 
@@ -165,10 +180,14 @@ export function useBridgeTransaction() {
           return
         }
 
+        // Get the bridge instance from the quote
+        const bridgeInstance = quote.bridgeName === 'Synapse' 
+          ? new SynapseBridge()
+          : new DeBridge()
+
         // Proceed with the bridge transaction
         console.log('Getting transaction data from bridge...')
-        const bridge = new SynapseBridge()
-        const tx = await bridge.prepareTransaction(quote, toAddress)
+        const tx = await bridgeInstance.prepareTransaction(quote, toAddress)
         console.log('Received transaction data:', tx)
 
         // Prepare the transaction request
@@ -188,7 +207,7 @@ export function useBridgeTransaction() {
         // Update state with the transaction hash
         setState(prev => ({ 
           ...prev, 
-          hash: result.hash, 
+          hash: result, 
           isLoading: false,
           needsApproval: false 
         }))

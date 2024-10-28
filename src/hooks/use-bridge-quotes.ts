@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react'
 import { BridgeQuote, QuoteRequest } from '../types/bridge'
 import { SynapseBridge } from '../bridges/synapse'
+import { DeBridge } from '../bridges/debridge'
 
-// Array of bridge instances - we'll add more bridges here later
+// Array of bridge instances
 const bridges = [
-  new SynapseBridge()
+  new SynapseBridge(),
+  new DeBridge()
 ]
 
 export function useBridgeQuotes(request: QuoteRequest | null) {
