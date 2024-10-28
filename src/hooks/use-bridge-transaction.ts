@@ -1,95 +1,217 @@
-import { useState } from 'react'
-import { useTransaction, useSendTransaction, useAccount, useSwitchChain } from 'wagmi'
+// hooks/useBridgeTransaction.ts
+import { useState, useCallback } from 'react'
+import {
+  useTransaction,
+  useSendTransaction,
+  useAccount,
+  useSwitchChain,
+  useWriteContract,
+  usePublicClient,
+  useWaitForTransactionReceipt,
+} from 'wagmi'
 import { BridgeQuote } from '../types/bridge'
 import { SynapseBridge } from '../bridges/synapse'
 import { Address } from 'viem'
 import { getChainId } from '../utils/chains'
 
+// Minimal ERC20 ABI
+const ERC20_ABI = [
+  {
+    name: 'allowance',
+    type: 'function',
+    stateMutability: 'view',
+    inputs: [
+      { name: 'owner', type: 'address' },
+      { name: 'spender', type: 'address' },
+    ],
+    outputs: [{ name: '', type: 'uint256' }],
+  },
+  {
+    name: 'approve',
+    type: 'function',
+    stateMutability: 'nonpayable',
+    inputs: [
+      { name: 'spender', type: 'address' },
+      { name: 'amount', type: 'uint256' },
+    ],
+    outputs: [{ name: '', type: 'bool' }],
+  },
+]
+
 interface BridgeTransactionState {
   isLoading: boolean
   error: Error | null
-  hash: `0x${string}` | null
+  hash: `0x${string}` | undefined
+  needsApproval: boolean
 }
+
+const SYNAPSE_RFQ_ROUTER = '0x00cD000000003f7F682BE4813200893d4e690000' as const
 
 export function useBridgeTransaction() {
   const [state, setState] = useState<BridgeTransactionState>({
     isLoading: false,
     error: null,
-    hash: null,
+    hash: undefined,
+    needsApproval: false
   })
 
-  const { chain } = useAccount()
+  const { address, chain } = useAccount()
   const { switchChain } = useSwitchChain()
   const { sendTransactionAsync } = useSendTransaction()
+  const publicClient = usePublicClient()
 
   // Watch the transaction
   const { isLoading: isConfirming } = useTransaction({
-    hash: state.hash ?? undefined,
+    hash: state.hash,
   })
 
-  const executeBridge = async (quote: BridgeQuote, toAddress: Address) => {
-    console.log('Executing bridge with quote:', quote)
-    console.log('To address:', toAddress)
+  // Token approval contract write
+  const { writeContractAsync } = useWriteContract()
 
-    setState({ isLoading: true, error: null, hash: null })
+  // Wait for approval transaction
+  const { isLoading: isWaitingForApproval } = useWaitForTransactionReceipt({
+    hash: state.hash,
+  })
 
-    try {
-      // Check if we're on the correct chain
-      const requiredChainId = getChainId(quote.fromToken.chain)
-      if (!requiredChainId) {
-        throw new Error(`Unsupported chain: ${quote.fromToken.chain}`)
+  // Function to check allowance
+  const checkAllowance = useCallback(
+    async (
+      tokenAddress: Address,
+      spender: Address,
+      amount: bigint
+    ): Promise<boolean> => {
+      if (!address || !publicClient) {
+        throw new Error('Wallet not connected')
       }
 
-      console.log('Current chain:', chain?.id, 'Required chain:', requiredChainId)
-      
-      if (chain?.id !== requiredChainId) {
-        console.log('Switching to required chain...')
-        await switchChain({ chainId: requiredChainId })
+      const allowanceData = await publicClient.readContract({
+        address: tokenAddress,
+        abi: ERC20_ABI,
+        functionName: 'allowance',
+        args: [address, spender],
+      })
+
+      const allowance = allowanceData as bigint
+      return allowance >= amount
+    },
+    [address, publicClient]
+  )
+
+  // Function to handle token approval
+  const handleApproval = useCallback(
+    async (
+      tokenAddress: Address,
+      spender: Address,
+      amount: bigint
+    ): Promise<void> => {
+      if (!address || !publicClient) {
+        throw new Error('Wallet not connected')
       }
 
-      let bridge
-      switch (quote.bridgeName) {
-        case 'Synapse':
-          bridge = new SynapseBridge()
-          break
-        default:
-          throw new Error(`Unsupported bridge provider: ${quote.bridgeName}`)
+      try {
+        // Request approval
+        const result = await writeContractAsync({
+          address: tokenAddress,
+          abi: ERC20_ABI,
+          functionName: 'approve',
+          args: [spender, amount],
+        })
+
+        setState(prev => ({ ...prev, hash: result }))
+      } catch (error) {
+        console.error('Approval error:', error)
+        throw error
+      }
+    },
+    [address, publicClient, writeContractAsync]
+  )
+
+  // Function to execute the bridge transaction
+  const executeBridge = useCallback(
+    async (quote: BridgeQuote, toAddress: Address) => {
+      console.log('Executing bridge with quote:', quote)
+      console.log('To address:', toAddress)
+
+      if (!address) {
+        throw new Error('Wallet not connected')
       }
 
-      // Get the transaction data
-      console.log('Getting transaction data from bridge...')
-      const tx = await bridge.prepareTransaction(quote, toAddress)
-      console.log('Received transaction data:', tx)
+      setState(prev => ({ ...prev, isLoading: true, error: null, hash: undefined }))
 
-      // Prepare the transaction request
-      const request = {
-        to: tx.to,
-        data: tx.data,
-        value: tx.value,
-        chainId: tx.chainId,
-        account: toAddress,
+      try {
+        // Check if we're on the correct chain
+        const requiredChainId = getChainId(quote.fromToken.chain)
+        if (!requiredChainId) {
+          throw new Error(`Unsupported chain: ${quote.fromToken.chain}`)
+        }
+
+        console.log('Current chain:', chain?.id, 'Required chain:', requiredChainId)
+
+        if (chain?.id !== requiredChainId) {
+          console.log('Switching to required chain...')
+          await switchChain({ chainId: requiredChainId })
+        }
+
+        // Check if approval is needed
+        const amountRequired = BigInt(quote.fromAmount.toString())
+        const hasAllowance = await checkAllowance(
+          quote.fromToken.address as Address,
+          SYNAPSE_RFQ_ROUTER as Address,
+          amountRequired
+        )
+
+        if (!hasAllowance) {
+          setState(prev => ({ ...prev, needsApproval: true, isLoading: false }))
+          return
+        }
+
+        // Proceed with the bridge transaction
+        console.log('Getting transaction data from bridge...')
+        const bridge = new SynapseBridge()
+        const tx = await bridge.prepareTransaction(quote, toAddress)
+        console.log('Received transaction data:', tx)
+
+        // Prepare the transaction request
+        const request = {
+          to: tx.to,
+          data: tx.data,
+          value: tx.value,
+          chainId: tx.chainId,
+          account: toAddress,
+        }
+
+        console.log('Sending transaction with request:', request)
+
+        // Send the transaction
+        const result = await sendTransactionAsync(request)
+
+        // Update state with the transaction hash
+        setState(prev => ({ 
+          ...prev, 
+          hash: result.hash, 
+          isLoading: false,
+          needsApproval: false 
+        }))
+      } catch (error) {
+        console.error('Bridge transaction error:', error)
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred'
+        setState(prev => ({ 
+          ...prev, 
+          isLoading: false, 
+          error: new Error(errorMessage), 
+          hash: undefined,
+          needsApproval: false
+        }))
+        throw error
       }
- 
-      console.log('Sending transaction with request:', request)
-
-      // Send the transaction
-      const result = await sendTransactionAsync(request)
-      console.log('Transaction sent successfully:', result)
-
-      // Update state with the transaction hash
-      setState(prev => ({ ...prev, hash: result.hash, isLoading: false }))
-
-    } catch (error) {
-      console.error('Bridge transaction error:', error)
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred'
-      setState({ isLoading: false, error: new Error(errorMessage), hash: null })
-      throw error
-    }
-  }
+    },
+    [address, chain?.id, sendTransactionAsync, switchChain, checkAllowance]
+  )
 
   return {
     ...state,
-    isLoading: state.isLoading || isConfirming,
+    isLoading: state.isLoading || isConfirming || isWaitingForApproval,
     executeBridge,
+    handleApproval
   }
 }

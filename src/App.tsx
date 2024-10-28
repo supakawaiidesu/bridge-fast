@@ -74,7 +74,14 @@ function App() {
 
   // Get quotes from bridges
   const { quotes, loading: quotesLoading, error: quotesError } = useBridgeQuotes(quoteRequest);
-  const { executeBridge, isLoading: transactionLoading, error: transactionError, hash } = useBridgeTransaction();
+  const { 
+    executeBridge, 
+    handleApproval,
+    isLoading: transactionLoading, 
+    error: transactionError, 
+    hash,
+    needsApproval 
+  } = useBridgeTransaction();
 
   // Check if we need to switch networks
   const needsChainSwitch = useMemo(() => {
@@ -128,9 +135,22 @@ function App() {
 
     try {
       setHasClickedBridge(true);
-      await executeBridge(quotes[0], address);
+      
+      if (needsApproval) {
+        // Handle token approval
+        const quote = quotes[0];
+        const amountRequired = BigInt(quote.fromAmount.toString());
+        await handleApproval(
+          quote.fromToken.address as `0x${string}`,
+          '0x00cD000000003f7F682BE4813200893d4e690000' as `0x${string}`,
+          amountRequired
+        );
+      } else {
+        // Execute bridge transaction
+        await executeBridge(quotes[0], address);
+      }
     } catch (error) {
-      console.error('Bridge transaction failed:', error);
+      console.error('Transaction failed:', error);
       setHasClickedBridge(false);
     }
   };
@@ -147,7 +167,8 @@ function App() {
     if (quotesLoading) return 'Getting Best Route...';
     if (hasClickedBridge && transactionLoading) return 'Confirming Transaction...';
     if (needsChainSwitch) return `Switch to ${sourceToken.chain}`;
-    return 'Review Bridge';
+    if (needsApproval) return 'Approve';
+    return 'Bridge';
   };
 
   return (
