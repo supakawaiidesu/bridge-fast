@@ -3,6 +3,7 @@ import { ArrowDown } from 'lucide-react';
 import { useAccount, useChainId, useSwitchChain } from 'wagmi';
 import { Card } from './components/ui/card';
 import { Button } from './components/ui/button';
+import { Input } from './components/ui/input';
 import { TokenSelector } from './components/TokenSelector/TokenSelector';
 import { SwapHeader } from './components/SwapInterface/SwapHeader';
 import { TokenInput } from './components/SwapInterface/TokenInput';
@@ -24,6 +25,7 @@ import {
 function App() {
   const [sellAmount, setSellAmount] = useState<string>("0");
   const [buyAmount, setBuyAmount] = useState<string>("0");
+  const [destinationAddress, setDestinationAddress] = useState<string>("");
   const [isSourceTokenSelectorOpen, setIsSourceTokenSelectorOpen] = useState(false);
   const [isTargetTokenSelectorOpen, setIsTargetTokenSelectorOpen] = useState(false);
   const [hasClickedBridge, setHasClickedBridge] = useState(false);
@@ -123,6 +125,11 @@ function App() {
     setBuyAmount(value);
   };
 
+  const handleDestinationAddressChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setDestinationAddress(value);
+  };
+
   const handleButtonClick = async () => {
     if (!isConnected) {
       openConnectModal?.();
@@ -215,6 +222,15 @@ function App() {
             bgColor="#1b1b1b"
           />
 
+          <div className="mt-3">
+            <Input
+              placeholder="Send to another address (optional)"
+              value={destinationAddress}
+              onChange={handleDestinationAddressChange}
+              className="w-full bg-[#131313] border-[#242424] text-white placeholder:text-[#5e5e5e] h-10 px-4 rounded-2xl"
+            />
+          </div>
+
           <div className="px-4 py-2 text-sm">
             {quotesLoading ? (
               <span className="text-[#5e5e5e]">Loading quotes...</span>
@@ -227,7 +243,6 @@ function App() {
                     <div className="flex items-center justify-between w-full text-[#5e5e5e]">
                       <div className="flex items-center gap-3">
                         <span>Best rate via {quotes[0].bridgeName}</span>
-                        <div className="bg-[#1b1b1b] rounded-sm px-2.5 py-0.5 text-white pointer-events-none inline-flex items-center">⚡INSTANT</div>
                       </div>
                       <span className="flex items-center gap-1">
                         Fee: {utils.formatUnits(quotes[0].feeAmount, sourceToken.decimals)} {sourceToken.symbol}
