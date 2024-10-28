@@ -16,14 +16,14 @@ export function ChainSelector({ selectedChain, onChainSelect }: ChainSelectorPro
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="outline" className="w-full justify-between bg-[#131A2A] border-[#2B2D33] text-white">
+        <Button variant="outline" className="w-full justify-between bg-[#131313] border-[#2B2D33] text-white">
           <span className="flex items-center gap-2">
             {chains.find(c => c.name === selectedChain)?.icon}
             {selectedChain}
           </span>
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent className="w-[320px] bg-[#131A2A] border-[#2B2D33]">
+      <DropdownMenuContent className="w-[320px] bg-[#131313] border-[#2B2D33]">
         {chains.map((chain) => (
           <DropdownMenuItem
             key={chain.name}

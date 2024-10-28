@@ -151,11 +151,11 @@ function App() {
   };
 
   return (
-    <div className="min-h-screen bg-[#0D111C] text-white flex items-center justify-center p-4">
+    <div className="min-h-screen bg-[#131313] text-white flex items-center justify-center p-4">
       <div className="w-full max-w-[480px]">
         <SwapHeader />
 
-        <Card className="bg-[#0D111C] border-[#2B2D33] p-1">
+        <Card className="bg-[#131313] border-[#131313] p-1">
           <TokenInput
             label="Sell"
             amount={sellAmount}
@@ -164,15 +164,16 @@ function App() {
             onAmountChange={handleSellAmountChange}
             onTokenSelect={() => setIsSourceTokenSelectorOpen(true)}
             showChain={true}
+            bgColor="#131313"
           />
 
-          <div className="flex justify-center -my-2.5 relative z-10">
+          <div className="relative z-10 flex justify-center -my-4">
             <Button 
               variant="ghost" 
               size="icon" 
-              className="h-10 w-10 rounded-xl bg-[#131A2A] border border-[#2B2D33] hover:bg-[#1C2537]"
+              className="h-10 w-10 rounded-xl bg-[#1b1b1b] border-2 border-[#131313] hover:bg-[#242424]"
             >
-              <ArrowDown className="w-4 h-4" />
+              <ArrowDown className="w-4 h-4 text-white" />
             </Button>
           </div>
 
@@ -184,9 +185,10 @@ function App() {
             onAmountChange={handleBuyAmountChange}
             onTokenSelect={() => setIsTargetTokenSelectorOpen(true)}
             showChain={true}
+            bgColor="#1b1b1b"
           />
 
-          <div className="px-4 py-2 text-sm text-[#5D6785] flex items-center justify-between">
+          <div className="px-4 py-2 text-sm text-[#5e5e5e] flex items-center justify-between">
             {quotesLoading ? (
               <span>Loading quotes...</span>
             ) : quotesError ? (

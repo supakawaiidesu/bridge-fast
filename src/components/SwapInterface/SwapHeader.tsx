@@ -8,7 +8,7 @@ export function SwapHeader() {
     <div className="flex items-center justify-between mb-4">
       <div className="flex gap-4 text-sm">
         <button className="bg-[#2B2D33] px-3 py-1.5 rounded-full font-semibold">Swap</button>
-        <button className="text-[#5D6785] px-3 py-1.5">Trade Perps</button>
+        <button className="text-[#5e5e5e] px-3 py-1.5">Trade Perps</button>
       </div>
       <div className="flex items-center gap-2">
         <ConnectButton.Custom>
@@ -50,13 +50,13 @@ export function SwapHeader() {
                     <div className="flex items-center gap-2">
                       <Button
                         onClick={openChainModal}
-                        className="h-8 text-sm bg-[#131A2A] hover:bg-[#2B2D33] text-white rounded-full"
+                        className="h-8 text-sm bg-[#131313] hover:bg-[#2B2D33] text-white rounded-full"
                       >
                         {chain.name}
                       </Button>
                       <Button
                         onClick={openAccountModal}
-                        className="h-8 text-sm bg-[#131A2A] hover:bg-[#2B2D33] text-white rounded-full"
+                        className="h-8 text-sm bg-[#131313] hover:bg-[#2B2D33] text-white rounded-full"
                       >
                         {account.displayName}
                       </Button>
@@ -67,7 +67,7 @@ export function SwapHeader() {
             );
           }}
         </ConnectButton.Custom>
-        <Button variant="ghost" size="icon" className="text-[#5D6785] hover:text-white">
+        <Button variant="ghost" size="icon" className="text-[#5e5e5e] hover:text-white">
           <Settings className="w-5 h-5" />
         </Button>
       </div>

@@ -99,19 +99,19 @@ export function TokenList({ searchQuery, selectedChain, onSelect }: TokenListPro
                 </div>
                 <div className="text-left">
                   <div className="font-medium text-white">{asset.tokenSymbol}</div>
-                  <div className="text-sm text-[#5D6785]">{asset.tokenName}</div>
+                  <div className="text-sm text-[#5e5e5e]">{asset.tokenName}</div>
                 </div>
               </div>
               <div className="text-right">
                 <div className="font-medium text-white">{parseFloat(asset.balance).toFixed(6)}</div>
-                <div className="text-sm text-[#5D6785]">${parseFloat(asset.balanceUsd).toFixed(2)}</div>
+                <div className="text-sm text-[#5e5e5e]">${parseFloat(asset.balanceUsd).toFixed(2)}</div>
               </div>
             </button>
           );
         })
       )}
       {!isLoading && filteredBalances.length === 0 && (
-        <div className="text-center text-[#5D6785] py-4">
+        <div className="text-center text-[#5e5e5e] py-4">
           {isConnected ? 'No tokens found' : 'Connect wallet to view balances'}
         </div>
       )}
