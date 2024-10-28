@@ -1,5 +1,5 @@
 // hooks/useBridgeTransaction.ts
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import {
   useTransaction,
   useSendTransaction,
@@ -71,9 +71,16 @@ export function useBridgeTransaction() {
   const { writeContractAsync } = useWriteContract()
 
   // Wait for approval transaction
-  const { isLoading: isWaitingForApproval } = useWaitForTransactionReceipt({
+  const { isLoading: isWaitingForApproval, isSuccess: approvalSuccess } = useWaitForTransactionReceipt({
     hash: state.hash,
   })
+
+  // Reset approval state when approval transaction completes
+  useEffect(() => {
+    if (approvalSuccess && state.needsApproval) {
+      setState(prev => ({ ...prev, needsApproval: false, hash: undefined }))
+    }
+  }, [approvalSuccess, state.needsApproval])
 
   // Function to check allowance
   const checkAllowance = useCallback(
