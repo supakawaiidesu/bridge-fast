@@ -88,6 +88,40 @@ export interface DebridgeQuoteResponse {
   integratorPoints?: number
 }
 
+// Across specific types
+export interface AcrossQuoteResponse {
+  totalRelayFee: {
+    pct: string
+    total: string
+  }
+  relayerCapitalFee: {
+    pct: string
+    total: string
+  }
+  relayerGasFee: {
+    pct: string
+    total: string
+  }
+  lpFee: {
+    pct: string
+    total: string
+  }
+  timestamp: string
+  isAmountTooLow: boolean
+  quoteBlock: string
+  spokePoolAddress: string
+  exclusiveRelayer: string
+  exclusivityDeadline: string
+  expectedFillTimeSec: string
+  limits: {
+    minDeposit: number
+    maxDeposit: number
+    maxDepositInstant: number
+    maxDepositShortDelay: number
+    recommendedDepositInstant: number
+  }
+}
+
 // Bridge quote with properly typed provider data
 export interface BridgeQuote {
   bridgeName: string
@@ -98,7 +132,7 @@ export interface BridgeQuote {
   estimatedGasCost: string
   feeAmount: BigNumber
   priceImpact: number
-  providerData?: SynapseQuoteResponse | DebridgeQuoteResponse
+  providerData?: SynapseQuoteResponse | DebridgeQuoteResponse | AcrossQuoteResponse
 }
 
 export interface QuoteRequest {

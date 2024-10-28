@@ -2,11 +2,13 @@ import { useState, useEffect } from 'react'
 import { BridgeQuote, QuoteRequest } from '../types/bridge'
 import { SynapseBridge } from '../bridges/synapse'
 import { DeBridge } from '../bridges/debridge'
+import { AcrossBridge } from '../bridges/across'
 
 // Array of bridge instances
 const bridges = [
   new SynapseBridge(),
-  new DeBridge()
+  new DeBridge(),
+  new AcrossBridge()
 ]
 
 // Refresh interval in milliseconds
