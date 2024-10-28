@@ -22,7 +22,7 @@ interface AnkrBalanceResponse {
   assets: AnkrAsset[];
 }
 
-const POLLING_INTERVAL = 20000; // 10 seconds
+const POLLING_INTERVAL = 10000; // 10 seconds
 
 // Tokens to pin at the top of the list
 const PINNED_TOKENS = ['ETH', 'USDT', 'DAI', 'USDC', 'USDC.e'];
