@@ -14,6 +14,12 @@ import { QuoteRequest } from './types/bridge';
 import { utils } from 'ethers';
 import { useConnectModal } from '@rainbow-me/rainbowkit';
 import { getChainId } from './utils/chains';
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "./components/ui/accordion";
 
 function App() {
   const [sellAmount, setSellAmount] = useState<string>("0");
@@ -209,22 +215,40 @@ function App() {
             bgColor="#1b1b1b"
           />
 
-          <div className="px-4 py-2 text-sm text-[#5e5e5e] flex items-center justify-between">
+          <div className="px-4 py-2 text-sm">
             {quotesLoading ? (
-              <span>Loading quotes...</span>
+              <span className="text-[#5e5e5e]">Loading quotes...</span>
             ) : quotesError ? (
               <span className="text-red-500">{quotesError}</span>
             ) : quotes.length > 0 ? (
-              <>
-                <span>
-                  Best rate via {quotes[0].bridgeName}
-                </span>
-                <span className="flex items-center gap-1">
-                  Fee: {utils.formatUnits(quotes[0].feeAmount, sourceToken.decimals)} {sourceToken.symbol}
-                </span>
-              </>
+              <Accordion type="single" collapsible className="w-full">
+                <AccordionItem value="quotes" className="border-none">
+                  <AccordionTrigger className="py-0 hover:no-underline">
+                    <div className="flex items-center justify-between w-full text-[#5e5e5e]">
+                      <span>Best rate via {quotes[0].bridgeName}</span>
+                      <span className="flex items-center gap-1">
+                        Fee: {utils.formatUnits(quotes[0].feeAmount, sourceToken.decimals)} {sourceToken.symbol}
+                      </span>
+                    </div>
+                  </AccordionTrigger>
+                  <AccordionContent>
+                    <div className="mt-2 space-y-2">
+                      {quotes.slice(1).map((quote, index) => (
+                        <div key={index} className="flex items-center justify-between text-[#5e5e5e] py-1">
+                          <span>
+                            {quote.bridgeName}: {utils.formatUnits(quote.expectedOutput, targetToken.decimals)} {targetToken.symbol}
+                          </span>
+                          <span>
+                            Fee: {utils.formatUnits(quote.feeAmount, sourceToken.decimals)} {sourceToken.symbol}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </AccordionContent>
+                </AccordionItem>
+              </Accordion>
             ) : (
-              <span>No quotes available</span>
+              <span className="text-[#5e5e5e]">No quotes available</span>
             )}
           </div>
 
