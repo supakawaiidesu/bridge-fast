@@ -225,7 +225,10 @@ function App() {
                 <AccordionItem value="quotes" className="border-none">
                   <AccordionTrigger className="py-0 hover:no-underline">
                     <div className="flex items-center justify-between w-full text-[#5e5e5e]">
-                      <span>Best rate via {quotes[0].bridgeName}</span>
+                      <div className="flex items-center gap-3">
+                        <span>Best rate via {quotes[0].bridgeName}</span>
+                        <div className="bg-[#1b1b1b] rounded-sm px-2.5 py-0.5 text-white pointer-events-none inline-flex items-center">⚡INSTANT</div>
+                      </div>
                       <span className="flex items-center gap-1">
                         Fee: {utils.formatUnits(quotes[0].feeAmount, sourceToken.decimals)} {sourceToken.symbol}
                       </span>
