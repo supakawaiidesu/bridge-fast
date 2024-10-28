@@ -209,7 +209,7 @@ function App() {
 
           <div className="p-4">
             <Button 
-              className="w-full h-14 text-base font-semibold bg-[#FF00B8] hover:bg-[#E100A4] rounded-2xl"
+              className="w-full h-14 text-base font-semibold bg-[#6849f3] hover:bg-[#553ebb] rounded-2xl"
               disabled={quotesLoading || transactionLoading || (!needsChainSwitch && quotes.length === 0)}
               onClick={handleButtonClick}
             >
