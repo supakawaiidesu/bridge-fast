@@ -9,9 +9,10 @@ import {
   usePublicClient,
   useWaitForTransactionReceipt,
 } from 'wagmi'
-import { BridgeQuote, DebridgeQuoteResponse, SynapseQuoteResponse } from '../types/bridge'
+import { BridgeQuote, DebridgeQuoteResponse, SynapseQuoteResponse, AcrossQuoteResponse } from '../types/bridge'
 import { SynapseBridge } from '../bridges/synapse'
 import { DeBridge } from '../bridges/debridge'
+import { AcrossBridge } from '../bridges/across'
 import { Address } from 'viem'
 import { getChainId } from '../utils/chains'
 
@@ -45,6 +46,8 @@ interface BridgeTransactionState {
   hash: `0x${string}` | undefined
   needsApproval: boolean
 }
+
+const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000'
 
 export function useBridgeTransaction() {
   const [state, setState] = useState<BridgeTransactionState>({
@@ -83,15 +86,32 @@ export function useBridgeTransaction() {
         throw new Error('Wallet not connected')
       }
 
-      const allowanceData = await publicClient.readContract({
-        address: tokenAddress,
-        abi: ERC20_ABI,
-        functionName: 'allowance',
-        args: [address, spender],
-      })
+      try {
+        console.log('Checking allowance for:', {
+          token: tokenAddress,
+          owner: address,
+          spender,
+          requiredAmount: amount.toString()
+        })
 
-      const allowance = allowanceData as bigint
-      return allowance >= amount
+        const allowanceData = await publicClient.readContract({
+          address: tokenAddress,
+          abi: ERC20_ABI,
+          functionName: 'allowance',
+          args: [address, spender],
+        })
+
+        const allowance = allowanceData as bigint
+        console.log('Current allowance:', allowance.toString())
+        
+        const hasEnoughAllowance = allowance >= amount
+        console.log('Has enough allowance:', hasEnoughAllowance)
+        
+        return hasEnoughAllowance
+      } catch (error) {
+        console.error('Error checking allowance:', error)
+        throw error
+      }
     },
     [address, publicClient]
   )
@@ -108,6 +128,12 @@ export function useBridgeTransaction() {
       }
 
       try {
+        console.log('Requesting approval for:', {
+          token: tokenAddress,
+          spender,
+          amount: amount.toString()
+        })
+
         // Request approval
         const hash = await writeContractAsync({
           address: tokenAddress,
@@ -117,6 +143,7 @@ export function useBridgeTransaction() {
         })
 
         setState(prev => ({ ...prev, hash }))
+        console.log('Approval transaction sent:', hash)
       } catch (error) {
         console.error('Approval error:', error)
         throw error
@@ -133,6 +160,10 @@ export function useBridgeTransaction() {
 
       if (!address) {
         throw new Error('Wallet not connected')
+      }
+
+      if (!quote.fromToken.address) {
+        throw new Error('Token address required')
       }
 
       setState(prev => ({ ...prev, isLoading: true, error: null, hash: undefined }))
@@ -159,31 +190,72 @@ export function useBridgeTransaction() {
           throw new Error('Missing provider data in quote')
         }
 
-        if (quote.bridgeName === 'Synapse') {
-          const synapseData = providerData as SynapseQuoteResponse
-          spenderAddress = synapseData.routerAddress as Address
+        console.log('Getting spender address for bridge:', quote.bridgeName)
+
+        // Get the spender address based on the bridge name
+        switch (quote.bridgeName) {
+          case 'Synapse': {
+            const synapseData = providerData as SynapseQuoteResponse
+            spenderAddress = synapseData.routerAddress as Address
+            console.log('Using Synapse router:', spenderAddress)
+            break
+          }
+          case 'deBridge': {
+            const debridgeData = providerData as DebridgeQuoteResponse
+            spenderAddress = debridgeData.tx.allowanceTarget as Address
+            console.log('Using deBridge router:', spenderAddress)
+            break
+          }
+          case 'Across': {
+            const acrossData = providerData as AcrossQuoteResponse
+            spenderAddress = acrossData.spokePoolAddress as Address
+            console.log('Using Across SpokePool:', spenderAddress)
+            break
+          }
+          default:
+            throw new Error(`Unknown bridge: ${quote.bridgeName}`)
+        }
+
+        // Check if token is native (ETH/MATIC/etc)
+        const isNativeToken = quote.fromToken.address.toLowerCase() === ZERO_ADDRESS.toLowerCase()
+
+        // Only check allowance for non-native tokens
+        if (!isNativeToken) {
+          console.log('Token is not native, checking allowance...')
+          // Convert amount to bigint for allowance check
+          const amountRequired = BigInt(quote.fromAmount.toString())
+          
+          const hasAllowance = await checkAllowance(
+            quote.fromToken.address as Address,
+            spenderAddress,
+            amountRequired
+          )
+
+          if (!hasAllowance) {
+            console.log('Insufficient allowance, approval needed')
+            setState(prev => ({ ...prev, needsApproval: true, isLoading: false }))
+            return
+          }
+          console.log('Sufficient allowance found, proceeding with transaction')
         } else {
-          const debridgeData = providerData as DebridgeQuoteResponse
-          spenderAddress = debridgeData.tx.allowanceTarget as Address
+          console.log('Token is native, skipping allowance check')
         }
 
-        // Check if approval is needed
-        const amountRequired = BigInt(quote.fromAmount.toString())
-        const hasAllowance = await checkAllowance(
-          quote.fromToken.address as Address,
-          spenderAddress,
-          amountRequired
-        )
-
-        if (!hasAllowance) {
-          setState(prev => ({ ...prev, needsApproval: true, isLoading: false }))
-          return
+        // Get the bridge instance based on the quote
+        let bridgeInstance
+        switch (quote.bridgeName) {
+          case 'Synapse':
+            bridgeInstance = new SynapseBridge()
+            break
+          case 'deBridge':
+            bridgeInstance = new DeBridge()
+            break
+          case 'Across':
+            bridgeInstance = new AcrossBridge()
+            break
+          default:
+            throw new Error(`Unknown bridge: ${quote.bridgeName}`)
         }
-
-        // Get the bridge instance from the quote
-        const bridgeInstance = quote.bridgeName === 'Synapse' 
-          ? new SynapseBridge()
-          : new DeBridge()
 
         // Proceed with the bridge transaction
         console.log('Getting transaction data from bridge...')

@@ -1,8 +1,34 @@
 import { BigNumber } from 'ethers'
 import { Bridge, BridgeQuote, BridgeTransaction, QuoteRequest, AcrossQuoteResponse } from '../types/bridge'
 import { getChainId } from '../utils/chains'
+import { Address, encodeFunctionData } from 'viem'
 
 const ACROSS_API_URL = 'https://app.across.to/api/suggested-fees'
+const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000'
+
+// SpokePool ABI for depositV3
+const SPOKE_POOL_ABI = [
+  {
+    name: 'depositV3',
+    type: 'function',
+    stateMutability: 'payable',
+    inputs: [
+      { name: 'depositor', type: 'address' },
+      { name: 'recipient', type: 'address' },
+      { name: 'inputToken', type: 'address' },
+      { name: 'outputToken', type: 'address' },
+      { name: 'inputAmount', type: 'uint256' },
+      { name: 'outputAmount', type: 'uint256' },
+      { name: 'destinationChainId', type: 'uint256' },
+      { name: 'exclusiveRelayer', type: 'address' },
+      { name: 'quoteTimestamp', type: 'uint32' },
+      { name: 'fillDeadline', type: 'uint32' },
+      { name: 'exclusivityDeadline', type: 'uint32' },
+      { name: 'message', type: 'bytes' }
+    ],
+    outputs: [],
+  }
+]
 
 export class AcrossBridge implements Bridge {
   name = 'Across'
@@ -13,8 +39,6 @@ export class AcrossBridge implements Bridge {
     tokenAddress: string,
     amount: string,
   ): Promise<AcrossQuoteResponse> {
-    // Convert amount to raw amount (e.g. 1 USDC = 1e6, 1 ETH = 1e18)
-    // For now assuming 18 decimals, in production would need to handle different token decimals
     const params = new URLSearchParams({
       originChainId: originChainId.toString(),
       destinationChainId: destinationChainId.toString(),
@@ -89,9 +113,88 @@ export class AcrossBridge implements Bridge {
     }
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  async prepareTransaction(_quote: BridgeQuote, _toAddress: string): Promise<BridgeTransaction> {
-    // This will be implemented later as mentioned in the task
-    throw new Error('Transaction preparation not yet implemented for Across')
+  async prepareTransaction(quote: BridgeQuote, toAddress: string): Promise<BridgeTransaction> {
+    if (!quote.providerData || !('spokePoolAddress' in quote.providerData)) {
+      throw new Error('Missing Across quote data')
+    }
+
+    const acrossQuote = quote.providerData as AcrossQuoteResponse
+    const fromChainId = getChainId(quote.fromToken.chain)
+    const toChainId = getChainId(quote.toToken.chain)
+
+    if (!fromChainId || !toChainId) {
+      throw new Error('Unsupported chain')
+    }
+
+    if (!quote.toToken.address) {
+      throw new Error('Destination token address required')
+    }
+
+    try {
+      console.log('Preparing Across bridge transaction with params:', {
+        fromChainId,
+        toChainId,
+        fromToken: quote.fromToken.address,
+        toToken: quote.toToken.address,
+        amount: quote.fromAmount.toString(),
+        toAddress
+      })
+
+      // Calculate fill deadline (5 hours from now)
+      const fillDeadlineBuffer = 18000 // 5 hours in seconds
+      const fillDeadline = Math.round(Date.now() / 1000) + fillDeadlineBuffer
+
+      // Construct depositV3 parameters
+      const depositParams = {
+        depositor: toAddress as Address,
+        recipient: toAddress as Address,
+        inputToken: quote.fromToken.address as Address,
+        outputToken: quote.toToken.address as Address, // Use actual destination token address
+        inputAmount: BigInt(quote.fromAmount.toString()),
+        outputAmount: BigInt(quote.expectedOutput.toString()),
+        destinationChainId: BigInt(toChainId),
+        exclusiveRelayer: acrossQuote.exclusiveRelayer as Address,
+        quoteTimestamp: Number(acrossQuote.timestamp),
+        fillDeadline,
+        exclusivityDeadline: Number(acrossQuote.exclusivityDeadline),
+        message: '0x' as `0x${string}` // No message for basic transfers
+      }
+
+      console.log('Constructing depositV3 call with params:', depositParams)
+
+      // Encode the function call
+      const data = encodeFunctionData({
+        abi: SPOKE_POOL_ABI,
+        functionName: 'depositV3',
+        args: [
+          depositParams.depositor,
+          depositParams.recipient,
+          depositParams.inputToken,
+          depositParams.outputToken,
+          depositParams.inputAmount,
+          depositParams.outputAmount,
+          depositParams.destinationChainId,
+          depositParams.exclusiveRelayer,
+          depositParams.quoteTimestamp,
+          depositParams.fillDeadline,
+          depositParams.exclusivityDeadline,
+          depositParams.message
+        ]
+      })
+
+      const bridgeTransaction: BridgeTransaction = {
+        to: acrossQuote.spokePoolAddress as Address,
+        data,
+        value: quote.fromToken.address === ZERO_ADDRESS ? depositParams.inputAmount : BigInt(0), // Only send value if using native token
+        chainId: fromChainId
+      }
+
+      console.log('Prepared bridge transaction:', bridgeTransaction)
+
+      return bridgeTransaction
+    } catch (error) {
+      console.error('Across transaction preparation error:', error)
+      throw error
+    }
   }
 }
