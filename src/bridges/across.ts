@@ -126,11 +126,16 @@ export class AcrossBridge implements Bridge {
       throw new Error('Unsupported chain')
     }
 
+    if (!quote.toToken.address) {
+      throw new Error('Destination token address required')
+    }
+
     try {
       console.log('Preparing Across bridge transaction with params:', {
         fromChainId,
         toChainId,
         fromToken: quote.fromToken.address,
+        toToken: quote.toToken.address,
         amount: quote.fromAmount.toString(),
         toAddress
       })
@@ -144,7 +149,7 @@ export class AcrossBridge implements Bridge {
         depositor: toAddress as Address,
         recipient: toAddress as Address,
         inputToken: quote.fromToken.address as Address,
-        outputToken: ZERO_ADDRESS as Address, // Will be resolved to equivalent token on destination
+        outputToken: quote.toToken.address as Address, // Use actual destination token address
         inputAmount: BigInt(quote.fromAmount.toString()),
         outputAmount: BigInt(quote.expectedOutput.toString()),
         destinationChainId: BigInt(toChainId),

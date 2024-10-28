@@ -11,7 +11,7 @@ import { TokenWithChain } from './types/token';
 import { TOKEN_LIST } from './data/tokens';
 import { useBridgeQuotes } from './hooks/use-bridge-quotes';
 import { useBridgeTransaction } from './hooks/use-bridge-transaction';
-import { QuoteRequest } from './types/bridge';
+import { QuoteRequest, SynapseQuoteResponse, DebridgeQuoteResponse, AcrossQuoteResponse } from './types/bridge';
 import { utils } from 'ethers';
 import { useConnectModal } from '@rainbow-me/rainbowkit';
 import { getChainId } from './utils/chains';
@@ -130,6 +130,34 @@ function App() {
     setDestinationAddress(value);
   };
 
+  const getSpenderAddress = (quote: typeof quotes[0]): `0x${string}` => {
+    if (!quote.providerData) {
+      throw new Error('Missing provider data in quote');
+    }
+
+    console.log('Getting spender address for bridge:', quote.bridgeName);
+
+    switch (quote.bridgeName) {
+      case 'Synapse': {
+        const synapseData = quote.providerData as SynapseQuoteResponse;
+        console.log('Using Synapse router:', synapseData.routerAddress);
+        return synapseData.routerAddress as `0x${string}`;
+      }
+      case 'deBridge': {
+        const debridgeData = quote.providerData as DebridgeQuoteResponse;
+        console.log('Using deBridge router:', debridgeData.tx.allowanceTarget);
+        return debridgeData.tx.allowanceTarget as `0x${string}`;
+      }
+      case 'Across': {
+        const acrossData = quote.providerData as AcrossQuoteResponse;
+        console.log('Using Across SpokePool:', acrossData.spokePoolAddress);
+        return acrossData.spokePoolAddress as `0x${string}`;
+      }
+      default:
+        throw new Error(`Unknown bridge: ${quote.bridgeName}`);
+    }
+  };
+
   const handleButtonClick = async () => {
     if (!isConnected) {
       openConnectModal?.();
@@ -149,18 +177,23 @@ function App() {
     try {
       setHasClickedBridge(true);
       
+      const bestQuote = quotes[0];
+      
       if (needsApproval) {
+        // Get the correct spender address based on the bridge
+        const spenderAddress = getSpenderAddress(bestQuote);
+        console.log('Using spender address for approval:', spenderAddress);
+        
         // Handle token approval
-        const quote = quotes[0];
-        const amountRequired = BigInt(quote.fromAmount.toString());
+        const amountRequired = BigInt(bestQuote.fromAmount.toString());
         await handleApproval(
-          quote.fromToken.address as `0x${string}`,
-          '0x00cD000000003f7F682BE4813200893d4e690000' as `0x${string}`,
+          bestQuote.fromToken.address as `0x${string}`,
+          spenderAddress,
           amountRequired
         );
       } else {
         // Execute bridge transaction
-        await executeBridge(quotes[0], address);
+        await executeBridge(bestQuote, address);
       }
     } catch (error) {
       console.error('Transaction failed:', error);
