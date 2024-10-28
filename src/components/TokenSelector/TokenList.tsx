@@ -3,12 +3,26 @@ import { TokenWithChain } from '../../types/token';
 import { useTokenBalances } from '../../hooks/use-token-balances';
 import { useAccount } from 'wagmi';
 import { Skeleton } from '../ui/skeleton';
+import arbitrumIcon from '../../icons/arbitrum.svg';
+import baseIcon from '../../icons/base.svg';
+import ethereumIcon from '../../icons/ethereum.svg';
+import optimismIcon from '../../icons/optimism.svg';
+import polygonIcon from '../../icons/polygon.svg';
 
 interface TokenListProps {
   searchQuery: string;
   selectedChain: string;
   onSelect: (token: TokenWithChain) => void;
 }
+
+const chainIcons: Record<string, string> = {
+  ethereum: ethereumIcon,
+  eth: ethereumIcon,
+  arbitrum: arbitrumIcon,
+  optimism: optimismIcon,
+  polygon: polygonIcon,
+  base: baseIcon,
+};
 
 export function TokenList({ searchQuery, selectedChain, onSelect }: TokenListProps) {
   const { isConnected } = useAccount();
@@ -55,7 +69,7 @@ export function TokenList({ searchQuery, selectedChain, onSelect }: TokenListPro
             logo: asset.thumbnail || tokenInfo?.logo || '',
             chain: formatChainName(asset.blockchain),
             address: asset.contractAddress || '',
-            decimals: tokenInfo?.decimals || 18, // Default to 18 decimals if not found
+            decimals: tokenInfo?.decimals || 18,
             balance: asset.balance,
             value: `$${parseFloat(asset.balanceUsd).toFixed(2)}`
           };
@@ -67,23 +81,25 @@ export function TokenList({ searchQuery, selectedChain, onSelect }: TokenListPro
               className="w-full p-3 flex items-center justify-between rounded-lg hover:bg-[#2B2D33] transition-colors"
             >
               <div className="flex items-center gap-3">
-                <img 
-                  src={uiToken.logo} 
-                  alt={asset.tokenName} 
-                  className="w-8 h-8"
-                  onError={(e) => {
-                    const img = e.target as HTMLImageElement;
-                    img.src = 'https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/info/logo.png';
-                  }}
-                />
+                <div className="relative">
+                  <img 
+                    src={uiToken.logo} 
+                    alt={asset.tokenName} 
+                    className="w-8 h-8 rounded-full"
+                    onError={(e) => {
+                      const img = e.target as HTMLImageElement;
+                      img.src = 'https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/info/logo.png';
+                    }}
+                  />
+                  <img 
+                    src={chainIcons[asset.blockchain]}
+                    alt={formatChainName(asset.blockchain)}
+                    className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-[#1A1B1F] p-0.5"
+                  />
+                </div>
                 <div className="text-left">
                   <div className="font-medium text-white">{asset.tokenSymbol}</div>
-                  <div className="text-sm text-[#5D6785]">
-                    {asset.tokenName}
-                    {selectedChain === 'All networks' && (
-                      <span className="ml-2 text-[#5D6785]">on {formatChainName(asset.blockchain)}</span>
-                    )}
-                  </div>
+                  <div className="text-sm text-[#5D6785]">{asset.tokenName}</div>
                 </div>
               </div>
               <div className="text-right">

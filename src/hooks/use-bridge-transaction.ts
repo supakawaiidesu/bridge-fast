@@ -69,7 +69,7 @@ export function useBridgeTransaction() {
         chainId: tx.chainId,
         account: toAddress,
       }
-
+ 
       console.log('Sending transaction with request:', request)
 
       // Send the transaction

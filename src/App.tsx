@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from 'react';
 import { ArrowDown } from 'lucide-react';
-import { useAccount } from 'wagmi';
+import { useAccount, useChainId, useSwitchChain } from 'wagmi';
 import { Card } from './components/ui/card';
 import { Button } from './components/ui/button';
 import { TokenSelector } from './components/TokenSelector/TokenSelector';
@@ -13,6 +13,7 @@ import { useBridgeTransaction } from './hooks/use-bridge-transaction';
 import { QuoteRequest } from './types/bridge';
 import { utils } from 'ethers';
 import { useConnectModal } from '@rainbow-me/rainbowkit';
+import { getChainId } from './utils/chains';
 
 function App() {
   const [sellAmount, setSellAmount] = useState<string>("0");
@@ -22,6 +23,8 @@ function App() {
   const [hasClickedBridge, setHasClickedBridge] = useState(false);
   
   const { address, isConnected } = useAccount();
+  const chainId = useChainId();
+  const { switchChain } = useSwitchChain();
   const { openConnectModal } = useConnectModal();
   
   // Initialize with default tokens on different chains
@@ -29,7 +32,7 @@ function App() {
     symbol: TOKEN_LIST.tokens[1].symbol,
     name: TOKEN_LIST.tokens[1].name,
     logo: TOKEN_LIST.tokens[1].logo,
-    chain: 'Ethereum',
+    chain: 'Arbitrum',
     address: TOKEN_LIST.tokens[1].addresses.ethereum,
     decimals: TOKEN_LIST.tokens[1].decimals,
     balance: '0',
@@ -73,6 +76,13 @@ function App() {
   const { quotes, loading: quotesLoading, error: quotesError } = useBridgeQuotes(quoteRequest);
   const { executeBridge, isLoading: transactionLoading, error: transactionError, hash } = useBridgeTransaction();
 
+  // Check if we need to switch networks
+  const needsChainSwitch = useMemo(() => {
+    if (!chainId || !sourceToken) return false;
+    const requiredChainId = getChainId(sourceToken.chain);
+    return chainId !== requiredChainId;
+  }, [chainId, sourceToken]);
+
   // Use the best quote to set the buy amount
   useEffect(() => {
     if (quotes.length > 0) {
@@ -100,9 +110,17 @@ function App() {
     setBuyAmount(value);
   };
 
-  const handleBridgeClick = async () => {
+  const handleButtonClick = async () => {
     if (!isConnected) {
       openConnectModal?.();
+      return;
+    }
+
+    if (needsChainSwitch) {
+      const requiredChainId = getChainId(sourceToken.chain);
+      if (requiredChainId) {
+        switchChain({ chainId: requiredChainId });
+      }
       return;
     }
 
@@ -123,6 +141,14 @@ function App() {
       setHasClickedBridge(false);
     }
   }, [hash]);
+
+  const getButtonText = () => {
+    if (!isConnected) return 'Connect Wallet';
+    if (quotesLoading) return 'Getting Best Route...';
+    if (hasClickedBridge && transactionLoading) return 'Confirming Transaction...';
+    if (needsChainSwitch) return `Switch to ${sourceToken.chain}`;
+    return 'Review Bridge';
+  };
 
   return (
     <div className="min-h-screen bg-[#0D111C] text-white flex items-center justify-center p-4">
@@ -182,13 +208,10 @@ function App() {
           <div className="p-4">
             <Button 
               className="w-full h-14 text-base font-semibold bg-[#FF00B8] hover:bg-[#E100A4] rounded-2xl"
-              disabled={quotesLoading || transactionLoading || quotes.length === 0}
-              onClick={handleBridgeClick}
+              disabled={quotesLoading || transactionLoading || (!needsChainSwitch && quotes.length === 0)}
+              onClick={handleButtonClick}
             >
-              {!isConnected ? 'Connect Wallet' :
-               quotesLoading ? 'Getting Best Route...' : 
-               hasClickedBridge && transactionLoading ? 'Confirming Transaction...' : 
-               'Review Bridge'}
+              {getButtonText()}
             </Button>
             {transactionError && (
               <p className="mt-2 text-sm text-red-500">{transactionError.message}</p>
